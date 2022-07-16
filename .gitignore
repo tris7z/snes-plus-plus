@@ -1,4 +1,4 @@
-bin/
+build/
 CMakeFiles/
 .vscode/
 cmake_install.cmake

@@ -58,11 +58,11 @@ std::uint16_t CPU::getRegisterPC() {
     return PC;
 }
 
-void readAndExecute(std::string filename) {
+void CPU::readAndExecute(std::string filename) {
     //std::ofstream rom;
     //rom.open("../roms/SNES_Test_Program.sfc", std::ios::binary);
 }
 
-void helloWorld() {
+void CPU::helloWorld() {
     std::cout << "Hello SNES!" << std::endl;
 }
