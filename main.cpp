@@ -1,10 +1,10 @@
 #include "core/cpu.hpp"
 
 int main(int argc, char *argv[]) {
-    CPU cpu;
-
     if(argc == 1)
-        cpu.helloWorld();
+        std::cout << "Please enter rom path" << std::endl;
     else
-        cpu.readAndExecute(argv[1]);
+    {
+        CPU cpu(argv[1]);
+    }
 }
