@@ -59,8 +59,16 @@ std::uint16_t CPU::getRegisterPC() {
 }
 
 void CPU::readAndExecute(std::string filename) {
-    //std::ofstream rom;
-    //rom.open("../roms/SNES_Test_Program.sfc", std::ios::binary);
+    std::ifstream rom;
+    rom.open(filename, std::ios::binary);
+    
+    char romByte;
+    rom.read(&romByte, 1);
+    while (!rom.eof()) {
+        std::cout << std::hex << (unsigned int)romByte << std::endl;
+        rom.read(&romByte, 1);
+        return;
+    }
 }
 
 void CPU::helloWorld() {

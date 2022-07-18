@@ -1,7 +1,10 @@
 #include "core/cpu.hpp"
 
-int main() {
+int main(int argc, char *argv[]) {
     CPU cpu;
 
-    cpu.helloWorld();
+    if(argc == 1)
+        cpu.helloWorld();
+    else
+        cpu.readAndExecute(argv[1]);
 }
