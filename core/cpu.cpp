@@ -80,6 +80,13 @@ void CPU::readAndExecute() {
         uint16_t PC = this->getRegisterPC();
         uint8_t opcode = this->ram.read(PC);
         std::cout << "Opcode: " << std::hex << (unsigned int)opcode << std::endl;
+        if(!CPU::IMap.count(opcode)) {
+            std::cout << "Unknown opcode!" << std::endl;
+            this->dump_registers();
+            return;
+        }
+
+        // does the order matter here?
         this->setRegisterPC(PC+1);
         (this->*CPU::IMap[opcode])();
     }
@@ -94,13 +101,63 @@ void CPU::printHex(uint16_t val) {
 }
 
 void CPU::dump_registers() {
-    
+    printf("A    X    Y    SP    DB    DP    PB    PS    PC\n");
+    printf("%04x %04x %04x %04x  %04x  %04x  %04x  %04x  %04x\n",
+        this->getRegisterA(),
+        this->getRegisterX(),
+        this->getRegisterY(),
+        this->getRegisterSP(),
+        this->getRegisterDB(),
+        this->getRegisterDP(),
+        this->getRegisterPB(),
+        this->getRegisterPS(),
+        this->getRegisterPC());
+}
+
+std::vector<uint8_t> CPU::HexToBytes(const std::string& hex) {
+  std::vector<uint8_t> bytes;
+
+  for (unsigned int i = 0; i < hex.length(); i += 2) {
+    std::string byteString = hex.substr(i, 2);
+    uint8_t byte = (uint8_t) std::strtol(byteString.c_str(), NULL, 16);
+    bytes.push_back(byte);
+  }
+
+  return bytes;
 }
 
 void CPU::debugMode() {
-    //this->dump_registers();
+    std::string input;
+
     while(true) {
-        // ask for hex code, run function, print registers
+        this->setRegisterPC(1); // we would increment before executing
+        std::cout << "Enter an instruction byte (including any data): 0x";
+        std::cin >> std::hex >> input;
+        
+        try {
+            std::stoul(input, NULL, 16);
+        } catch (const std::invalid_argument& ia) {
+            std::cout << "Unrecognized input" << std::endl;
+            continue;      
+        }
+        if(input.length() % 2)
+            input = "0" + input; // even length string
+        
+        std::vector<uint8_t> dataBytes = this->HexToBytes(input);
+        for(int i = 0; i < (int)dataBytes.size(); i++) {
+            ram.write(i, dataBytes[i]);
+        }
+
+        if(CPU::IMap.count(dataBytes[0]))
+        {
+            (this->*CPU::IMap[dataBytes[0]])();
+            this->dump_registers();
+        }
+        else
+        {
+            std::cout << "Unknown instruction" << std::endl;
+        }
+
     }
 }
 
@@ -112,7 +169,6 @@ int CPU::test(std::string text) {
 //Instructions
 //Flag stuff
 int CPU::CLC() {
-    std::cout << "Running CLC" << std::endl;
     this->setRegisterPS(this->getRegisterPS() & ~(1 << 0));
     return 2;
 };
@@ -131,9 +187,149 @@ int CPU::REP() {
 }
 
 //Loads
-// todo: check flags for 8 or 16 bit (5th bit) + set cycles 
-int CPU::LDXi() {
-    this->setRegisterX(this->ram.read(this->getRegisterPC()));
+int CPU::LDX_i() { //TODO add negative flag check on this, INX, and LDA
+    bool halfWidth = (bool)( (this->getRegisterPS() & CPU::STATUS_INDEX_WIDTH) >> 4);
+    uint8_t loadData;
+    uint16_t registerX;
+    int cycles;
+
+    if(halfWidth)
+    {
+        loadData = this->ram.read(this->getRegisterPC());
+        registerX = loadData;
+        cycles = 2;
+    }
+    else {
+        // load two bytes into register X
+        loadData = this->ram.read(this->getRegisterPC());
+        registerX = loadData;
+        this->setRegisterPC(this->getRegisterPC()+1);
+        loadData = this->ram.read(this->getRegisterPC());
+        registerX += loadData << 8;
+        cycles = 3;
+    }
     this->setRegisterPC(this->getRegisterPC()+1);
+    
+    this->setRegisterX(registerX);
+    if(registerX == 0)
+        this->setRegisterPS(this->getRegisterPS() | CPU::STATUS_ZERO);
+    return cycles;
+}
+int CPU::LDA_i() {
+    bool halfWidth = (bool)( (this->getRegisterPS() & CPU::STATUS_ACCUM_WIDTH) >> 5);
+    uint8_t loadData;
+    uint16_t registerA; 
+    int cycles;
+
+    if(halfWidth)
+    {
+        loadData = this->ram.read(this->getRegisterPC());
+        registerA = loadData;
+        cycles = 2;
+    }
+    else {
+        // load two bytes into register A, low half first
+        loadData = this->ram.read(this->getRegisterPC());
+        registerA = loadData;
+        this->setRegisterPC(this->getRegisterPC()+1);
+        loadData = this->ram.read(this->getRegisterPC());
+        registerA += loadData << 8;
+        cycles = 3;
+    }
+    this->setRegisterPC(this->getRegisterPC()+1);
+    
+    this->setRegisterA(registerA);
+    if(registerA == 0)
+        this->setRegisterPS(this->getRegisterPS() | CPU::STATUS_ZERO);
+
+    return cycles;
+}
+int CPU::STA_AiX() { //TODO: Add halfwidth stuff here, if in 16 bit mode you add both bits to RAM
+    //bool halfWidth = (bool)( (this->getRegisterPS() & CPU::STATUS_ACCUM_WIDTH) >> 5);
+
+    uint16_t data = this->ram.read(this->getRegisterPC());
+    this->setRegisterPC(this->getRegisterPC()+1);
+    data += this->ram.read(this->getRegisterPC()) << 8;
+    this->setRegisterPC(this->getRegisterPC()+1);
+
+    uint16_t addr = data + this->getRegisterX();
+
+    this->ram.write(addr, (uint8_t)this->getRegisterA());
+    return 6;
+}
+
+int CPU::STA_addr() {
+    //bool halfWidth = (bool)( (this->getRegisterPS() & CPU::STATUS_ACCUM_WIDTH) >> 5);
+
+    uint16_t data = this->ram.read(this->getRegisterPC());
+    this->setRegisterPC(this->getRegisterPC()+1);
+    data += this->ram.read(this->getRegisterPC()) << 8;
+    this->setRegisterPC(this->getRegisterPC()+1);
+
+    this->ram.write(data, (uint8_t)this->getRegisterA());
+    return 4;
+}
+
+int CPU::INX() {
+    this->setRegisterX(this->getRegisterX()+1);
+    if(this->getRegisterX() == 0)
+        this->setRegisterPS(this->getRegisterPS() | CPU::STATUS_ZERO);
+    return 2;
+}
+
+int CPU::CPX() {
+    bool halfWidth = (bool)( (this->getRegisterPS() & CPU::STATUS_INDEX_WIDTH) >> 4);
+    uint8_t loadData;
+    int cycles;
+    uint16_t data;
+    
+    if(halfWidth)
+    {
+        loadData = this->ram.read(this->getRegisterPC());
+        data = loadData;
+        cycles = 2;
+    }
+    else
+    {
+        loadData = this->ram.read(this->getRegisterPC());
+        data = loadData;
+        this->setRegisterPC(this->getRegisterPC()+1);
+        loadData = this->ram.read(this->getRegisterPC());
+        data += loadData << 8;
+        cycles = 3;
+    }
+    this->setRegisterPC(this->getRegisterPC()+1);
+    
+    uint8_t result = this->getRegisterX() - data;
+    if((result) & STATUS_NEGATIVE)
+        this->setRegisterPS(this->getRegisterPS() | CPU::STATUS_NEGATIVE);
+    else
+        this->setRegisterPS(this->getRegisterPS() & ~CPU::STATUS_NEGATIVE);
+    if(result == 0)
+        this->setRegisterPS(this->getRegisterPS() | CPU::STATUS_ZERO);
+    else
+        this->setRegisterPS(this->getRegisterPS() & ~CPU::STATUS_ZERO);
+    if(this->getRegisterX() >= result)
+        this->setRegisterPS(this->getRegisterPS() | CPU::STATUS_CARRY);
+    else
+        this->setRegisterPS(this->getRegisterPS() & ~CPU::STATUS_CARRY);
+
+    return cycles;
+}
+
+int CPU::BNE() {
+    bool equal = (bool)( (this->getRegisterPS() & CPU::STATUS_ZERO) >> 1);
+    int8_t offset = this->ram.read(this->getRegisterPC());
+    int cycles = 2;
+    if(!equal) {
+        this->setRegisterPC(this->getRegisterPC() + offset);
+        cycles = 3;
+    }
+    this->setRegisterPC(this->getRegisterPC()+1);
+    return cycles;
+}
+
+int CPU::TXS() {
+    this->setRegisterSP(this->getRegisterX());
     return 2;
 }

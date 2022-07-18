@@ -1,5 +1,7 @@
 #include <cstdint>
+#include <cstdio>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <fstream>
 #include <unordered_map>
@@ -19,6 +21,15 @@ class CPU {
         std::uint16_t PC; // program counter
 
     public:
+        const uint8_t STATUS_CARRY = 1;
+        const uint8_t STATUS_ZERO = (1 << 1);
+        const uint8_t STATUS_IRQ_DISABLE = (1 << 2);
+        const uint8_t STATUS_DECIMAL = (1 << 3);
+        const uint8_t STATUS_INDEX_WIDTH = (1 << 4);
+        const uint8_t STATUS_ACCUM_WIDTH = (1 << 5);
+        const uint8_t STATUS_OVERFLOW = (1 << 6);
+        const uint8_t STATUS_NEGATIVE = (1 << 7);
+         
         typedef int (CPU::*instruction)(); // returns cycles
         std::unordered_map<std::uint16_t, instruction> IMap = {
 //            {0x18, (instruction)&CPU::test}
@@ -26,9 +37,14 @@ class CPU {
             {0xFB, (instruction)&CPU::XCE},
             {0xC2, (instruction)&CPU::REP},
             {0xE2, (instruction)&CPU::SEP},
-            {0xA2, (instruction)&CPU::LDXi},
-            
-            
+            {0xA2, (instruction)&CPU::LDX_i},
+            {0xA9, (instruction)&CPU::LDA_i},
+            {0x9D, (instruction)&CPU::STA_AiX},
+            {0xE8, (instruction)&CPU::INX},
+            {0xE0, (instruction)&CPU::CPX},
+            {0xD0, (instruction)&CPU::BNE},
+            {0x9A, (instruction)&CPU::TXS},
+            {0x8D, (instruction)&CPU::STA_addr},
 
         };
         RAM ram;
@@ -58,7 +74,8 @@ class CPU {
         // debug and helpers
         void debugMode(); // interactive interpreter
         void dump_registers();
-        void printHex(uint16_t val);
+        void printHex(uint16_t);
+        std::vector<uint8_t> HexToBytes(const std::string&);
         int test(std::string);
         void helloWorld();
 
@@ -67,7 +84,14 @@ class CPU {
         int XCE();
         int REP();
         int SEP();
-        int LDXi();
+        int LDX_i();
+        int LDA_i();
+        int STA_AiX();
+        int STA_addr();
+        int INX();
+        int CPX();
+        int BNE();
+        int TXS();
 
         CPU(std::string rom_path) {           
             // this could be replaced with an instruction function later
@@ -81,6 +105,9 @@ class CPU {
             setRegisterPS(0);
             setRegisterPC(0);
 
+            if(rom_path == "debug")
+                debugMode();
+                
             loadROM(rom_path);
             readAndExecute();
         }
