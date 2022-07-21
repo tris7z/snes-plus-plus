@@ -13,7 +13,8 @@ set(LIBRARY_OUTPUT_PATH  ${CMAKE_BINARY_DIR}/lib)
 
 project(SNES++ VERSION 0.1)
 
+add_library(core STATIC core/core.cpp)
 add_library(cpu STATIC core/cpu.cpp)
 add_library(ram STATIC core/ram.cpp)
 add_executable(snes++ main.cpp)
-target_link_libraries(snes++ cpu ram)
+target_link_libraries(snes++ core cpu ram)

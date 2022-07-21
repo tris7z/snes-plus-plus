@@ -1,4 +1,5 @@
-#include "core/cpu.hpp"
+#include <iostream>
+#include "core/core.hpp"
 
 int main(int argc, char *argv[]) {
     if(argc == 1)
@@ -7,6 +8,6 @@ int main(int argc, char *argv[]) {
     }
     else
     {
-        CPU cpu(argv[1]);
+        Core system(argv[1]);
     }
 }
