@@ -15,7 +15,6 @@ CPU::CPU(RAM* ram, std::string option) {
     }
     if(option == "test")
     {
-        this->test();
         this->getRAM()->memoryDump();
     }
 }
@@ -96,11 +95,10 @@ std::uint16_t CPU::getRegisterPC() {
 }
 
 uint8_t CPU::getProgramByte() {
-    uint8_t program_byte = this->getRAM()->read(this->getRegisterPB() + this->getRegisterPC());
+    uint8_t program_byte = this->getRAM()->read( (this->getRegisterPB() << 16) + this->getRegisterPC() );
     this->setRegisterPC( this->getRegisterPC()+1 );
     return program_byte;
 }
-
 void CPU::readAndExecute() {
     this->setRegisterPB(0x80);
     this->setRegisterPC(0x8000);
@@ -114,16 +112,8 @@ void CPU::readAndExecute() {
             this->dump_registers();
             return;
         }
-        (this->*CPU::IMap[opcode])(opcode);
+        ( this->*CPU::IMap.at(opcode) )(opcode);
     }
-}
-
-void CPU::helloWorld() {
-    std::cout << "Hello SNES!" << std::endl;
-}
-
-void CPU::printHex(uint16_t val) {
-    std::cout << std::hex << (unsigned int)val << std::endl;
 }
 
 void CPU::dump_registers() {
@@ -142,20 +132,20 @@ void CPU::dump_registers() {
 
 std::vector<uint8_t> CPU::HexToBytes(const std::string& hex) {
   std::vector<uint8_t> bytes;
-
-  for (unsigned int i = 0; i < hex.length(); i += 2) {
+  for (unsigned int i = 0; i < hex.length(); i += 2)
+  {
     std::string byteString = hex.substr(i, 2);
     uint8_t byte = (uint8_t) std::strtol(byteString.c_str(), NULL, 16);
     bytes.push_back(byte);
   }
-
   return bytes;
 }
 
 void CPU::debugMode() {
     std::string input;
 
-    while(true) {
+    while(true)
+    {
         this->setRegisterPC(1); // we would increment before executing
         std::cout << "Enter an instruction byte (including any data): 0x";
         std::cin >> std::hex >> input;
@@ -178,23 +168,14 @@ void CPU::debugMode() {
             this->getRAM()->write(i, dataBytes[i]);
         }
 
-        if(CPU::IMap.count(dataBytes[0]))
-        {
-            (this->*CPU::IMap[dataBytes[0]])(dataBytes[0]);
+        if(CPU::IMap.count(dataBytes[0])) {
+            ( this->*CPU::IMap.at(dataBytes[0]) )(dataBytes[0]);
             this->dump_registers();
         }
-        else
-        {
+        else {
             std::cout << "Unknown instruction" << std::endl;
         }
 
-    }
-}
-
-void CPU::test() {
-    uint8_t data[5] = {0x69, 0x69, 0x42, 0x04, 0x20};
-    for(int i = 0; i < 5; i++) {
-        this->getRAM()->write(i, data[i]);
     }
 }
 
@@ -244,27 +225,35 @@ int CPU::LDX(uint8_t opcode) {
             break;
         }
         case 0xAE:
+        {
             // LDY addr  Absolute (3 bytes)
             cycles = 4;
 
             break;
+        }
         case 0xA6:
+        {
             // LDY dp  Direct Page (2 bytes)
             cycles = 3;
 
             break;
+        }
         case 0xBE:
+        {
             // LDY addr, X  Absolute Indexed, X (3 bytes)
             cycles = 4;
 
             break;
+        }
         case 0xB6:
+        {
             // LDY dp, X  Direct Page Indexed, X (2 bytes)
             cycles = 4;
 
             break;
+        }
         default:
-            break;
+            return -1;
     }
     
     this->setRegisterX(registerX);
@@ -282,8 +271,8 @@ int CPU::LDY(uint8_t opcode) {
     uint8_t loadData;
     int cycles;
     switch(opcode) {
-        case 0xA0:
-            // LDY #const  Immediate (2/3 bytes)
+        case 0xA0: // LDY #const  Immediate (2/3 bytes)
+        { 
             cycles = 2;
             if(halfWidth)
             {
@@ -300,28 +289,33 @@ int CPU::LDY(uint8_t opcode) {
                 cycles = 3;
             }
             break;
-        case 0xAC:
-            // LDY addr  Absolute (3 bytes)
+        }
+        case 0xAC: // LDY addr  Absolute (3 bytes)
+        {
             cycles = 4;
 
             break;
-        case 0xA4:
-            // LDY dp  Direct Page (2 bytes)
+        }
+        case 0xA4: // LDY dp  Direct Page (2 bytes)
+        {
             cycles = 3;
 
             break;
+        }
         case 0xBC:
-            // LDY addr, X  Absolute Indexed, X (3 bytes)
+        {    // LDY addr, X  Absolute Indexed, X (3 bytes)
             cycles = 4;
 
             break;
+        }
         case 0xB4:
-            // LDY dp, X  Direct Page Indexed, X (2 bytes)
+        {    // LDY dp, X  Direct Page Indexed, X (2 bytes)
             cycles = 4;
 
             break;
+        }
         default:
-            break;
+            return -1;
     }
     
     this->setRegisterY(registerY);
@@ -334,27 +328,36 @@ int CPU::LDY(uint8_t opcode) {
     return cycles;
 }
 
-int CPU::LDA_i(uint8_t opcode) {
+int CPU::LDA(uint8_t opcode) {
     bool halfWidth = (bool)( (this->getRegisterPS() & CPU::STATUS_ACCUM_WIDTH) >> 5);
     uint8_t loadData;
     uint16_t registerA; 
     int cycles;
 
-    if(halfWidth)
+    switch(opcode)
     {
-        loadData = this->getProgramByte();
-        registerA = loadData;
-        cycles = 2;
+        case 0xA9:
+        {
+            if(halfWidth)
+            {
+                loadData = this->getProgramByte();
+                registerA = loadData;
+                cycles = 2;
+            }
+            else {
+                // load two bytes into register A, low half first
+                loadData = this->getProgramByte();
+                registerA = loadData;
+                loadData = this->getProgramByte();
+                registerA += loadData << 8;
+                cycles = 3;
+            };
+            break;
+        }
+        default:
+            return -1;
     }
-    else {
-        // load two bytes into register A, low half first
-        loadData = this->getProgramByte();
-        registerA = loadData;
-        loadData = this->getProgramByte();
-        registerA += loadData << 8;
-        cycles = 3;
-    };
-    
+
     this->setRegisterA(registerA);
     if(registerA == 0)
         this->setRegisterPS(this->getRegisterPS() | CPU::STATUS_ZERO);
@@ -362,7 +365,6 @@ int CPU::LDA_i(uint8_t opcode) {
         this->setRegisterPS(this->getRegisterPS() | CPU::STATUS_NEGATIVE);
     else
         this->setRegisterPS(this->getRegisterPS() & ~CPU::STATUS_NEGATIVE);
-    
     return cycles;
 }
 
@@ -372,32 +374,39 @@ int CPU::STA(uint8_t opcode) {
     int cycles;
     switch(opcode) {
         case 0x81:
+        {
             // STA (dp, X)  Direct Page Indirect, X (2 bytes)
             cycles = 6;
 
             break;
+        }
         case 0x83:
+        {
             // STA sr, S  Stack Relative (2 bytes)
             cycles = 4;
 
             break;
+        }
         case 0x85:
+        {
             // STA dp  Direct Page (2 bytes)
             cycles = 3;
 
             break;
+        }
         case 0x87:
+        {
             // STA [dp]  Direct Page Indirect Long (2 bytes)
             cycles = 6;
 
             break;
+        }
         case 0x8D:
         {
             // STA addr  Absolute (3 bytes)
             cycles = 4;
             uint16_t addr = this->getProgramByte();
             addr += this->getProgramByte() << 8;
-            this->setRegisterPC(this->getRegisterPC()+1);
 
             if(halfWidth) {
                 this->getRAM()->write(addr, (uint8_t)(this->getRegisterA() << 8 >> 8));
@@ -413,35 +422,47 @@ int CPU::STA(uint8_t opcode) {
             break;
         }
         case 0x8F:
+        {
             // STA long  Absolute Long (4 bytes)
             cycles = 5;
 
             break;
+        }
         case 0x91:
+        {
             // STA (dp), Y  DP Indirect Indexed, Y (2 bytes)
             cycles = 6;
 
             break;
+        }
         case 0x92:
+        {
             // STA (dp)  Direct Page Indirect (4 bytes)
             cycles = 5;
 
             break;
+        }
         case 0x93:
+        {
             // STA (sr, S)  SR Indirect Indexed, Y (2 bytes)
             cycles = 7;
 
             break;
+        }
         case 0x95:
+        {
             // STA dp, X  Direct Page Indexed, X (2 bytes)
             cycles = 4;
 
             break;
+        }
         case 0x97:
+        {
             // STA [dp], Y  DP Indirect Long Indexed, Y (2 bytes)
             cycles = 4;
 
             break;
+        }
         case 0x99:
         {
             // STA addr, Y  Absolute Indexed, Y (3 bytes)
@@ -487,12 +508,14 @@ int CPU::STA(uint8_t opcode) {
             break;
         }
         case 0x9F:
+        {
             // STA long, X  Absolute Long Indexed, X (4 bytes)
             cycles = 5;
 
             break;
+        }
         default:
-            break;
+            return -1;
     }
 
     return cycles;
@@ -565,26 +588,44 @@ int CPU::TXS(uint8_t opcode) {
 
 int CPU::MVN(uint8_t opcode) {
     int cycles;
-    uint8_t count = this->getRegisterA();
-    uint8_t src_bank = this->getProgramByte();
-    uint8_t src_block = this->getRegisterX();
-    uint8_t dest_bank = this->getProgramByte();
-    uint8_t dest_block = this->getRegisterY();
+    uint32_t startCount = this->getRegisterA();
+    uint32_t src_bank = this->getProgramByte() << 16;
+    uint32_t src_block = this->getRegisterX();
+    uint32_t dest_bank = this->getProgramByte() << 16;
+    uint32_t dest_block = this->getRegisterY();
 
-    //
+    while(this->getRegisterA() != 0xFFFF) {
+        uint32_t offset = (startCount - this->getRegisterA());
+        uint32_t dest_addr = dest_bank + dest_block + offset;
+        uint8_t data = this->getRAM()->read(src_bank + src_block + offset);
+        this->getRAM()->write(dest_addr, data);
+        this->setRegisterA(this->getRegisterA()-1);
+        cycles += 7;
+    }
+    this->setRegisterX(this->getRegisterX()+startCount);
+    this->setRegisterY(this->getRegisterY()+startCount);
     
     return cycles;
 }
 
 int CPU::MVP(uint8_t opcode) {
     int cycles;
-    uint8_t count = this->getRegisterA();
-    uint8_t src_bank = this->getProgramByte();
-    uint8_t src_block = this->getRegisterX();
-    uint8_t dest_bank = this->getProgramByte();
-    uint8_t dest_block = this->getRegisterY();
-    
-    //
+    uint32_t startCount = this->getRegisterA();
+    uint32_t src_bank = this->getProgramByte() << 16;
+    uint32_t src_block = this->getRegisterX();
+    uint32_t dest_bank = this->getProgramByte() << 16;
+    uint32_t dest_block = this->getRegisterY();
+
+    while(this->getRegisterA() != 0xFFFF) {
+        uint32_t offset = (startCount - this->getRegisterA());
+        uint32_t dest_addr = dest_bank + dest_block - offset;
+        uint8_t data = this->getRAM()->read(src_bank + src_block - offset);
+        this->getRAM()->write(dest_addr, data);
+        this->setRegisterA(this->getRegisterA()-1);
+        cycles += 7;
+    }
+    this->setRegisterX(this->getRegisterX()-startCount);
+    this->setRegisterY(this->getRegisterY()-startCount);
 
     return cycles;   
 }

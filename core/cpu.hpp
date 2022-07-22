@@ -23,7 +23,7 @@ class CPU {
         uint16_t DB; // data bank
         uint16_t DP; // direct page
         uint16_t PB; // program bank
-        uint8_t PS; // processor status - negative, overflow, 8-bit A, 8-bit X/Y, decimal, IRQ disable, zero, carry
+        uint8_t PS; // processor status
         uint16_t PC; // program counter
 
     public:
@@ -40,14 +40,14 @@ class CPU {
         const uint8_t STATUS_NEGATIVE = (1 << 7);
          
         typedef int (CPU::*instruction)(uint8_t); // returns cycles
-        std::unordered_map<std::uint16_t, instruction> IMap = {
+        const std::unordered_map<std::uint16_t, instruction> IMap = {
 //            {0x18, (instruction)&CPU::test}
             {0x18, (instruction)&CPU::CLC},
             {0xFB, (instruction)&CPU::XCE},
             {0xC2, (instruction)&CPU::REP},
             {0xE2, (instruction)&CPU::SEP},
             {0xA2, (instruction)&CPU::LDX},
-            {0xA9, (instruction)&CPU::LDA_i},
+            {0xA9, (instruction)&CPU::LDA},
             {0x8D, (instruction)&CPU::STA},
             {0x9D, (instruction)&CPU::STA},
             {0x99, (instruction)&CPU::STA},
@@ -56,8 +56,8 @@ class CPU {
             {0xD0, (instruction)&CPU::BNE},
             {0x9A, (instruction)&CPU::TXS},
             {0xA0, (instruction)&CPU::LDY},
-            //{0x54, (instruction)&CPU::MVN},
-            //{0x44, (instruction)&CPU::MVP},
+            {0x54, (instruction)&CPU::MVN},
+            {0x44, (instruction)&CPU::MVP},
 
         };
 
@@ -84,17 +84,12 @@ class CPU {
         uint16_t getRegisterPC();
 
         uint8_t getProgramByte();
-
         void readAndExecute();
-        void loadROM(std::string);
 
         // debug and helpers
         void debugMode(); // interactive interpreter
         void dump_registers();
-        void printHex(uint16_t);
         std::vector<uint8_t> HexToBytes(const std::string&);
-        void test();
-        void helloWorld();
 
         // instruction methods
         // TODO? maybe we should double check them all when they're done
@@ -103,7 +98,7 @@ class CPU {
         int REP(uint8_t);
         int SEP(uint8_t);
         int LDX(uint8_t);
-        int LDA_i(uint8_t);
+        int LDA(uint8_t);
         int STA(uint8_t);
         int INX(uint8_t);
         int CPX(uint8_t);

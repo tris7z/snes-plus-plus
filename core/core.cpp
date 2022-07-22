@@ -71,15 +71,5 @@ void Core::loadROM(std::string rom_path) {
         }
     }
 
-/*
-    uint32_t location = 0x8000;
-    char romByte;
-    while (!rom.eof()) {
-        if(rom.eof()) break;
-        rom.read(&romByte, 1);
-        this->ram->write(location, romByte);
-        location++;
-    }
-*/
     rom.close();
 }

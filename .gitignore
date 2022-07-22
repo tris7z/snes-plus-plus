@@ -5,6 +5,7 @@ cmake_install.cmake
 CMakeCache.txt
 libcore.a
 Makefile
+SNES_Test_Program.sfc
 zelda.sfc
 memdump.hex
 .DS_Store
